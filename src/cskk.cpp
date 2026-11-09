@@ -32,6 +32,7 @@
 #include <fcitx-utils/key.h>
 #include <fcitx-utils/keysym.h>
 #include <fcitx-utils/log.h>
+#include <fcitx/surroundingtext.h>
 #if __has_include(<fcitx-utils/standardpaths.h>)
 #include <fcitx-utils/standardpaths.h>
 #define FCITX_HAS_STANDARDPATHS 1
@@ -331,6 +332,59 @@ bool FcitxCskkEngine::isEngineReady() { return factory_.registered(); }
  * CskkContext
  ******************************************************************************/
 
+namespace {
+// 文脈としてlibcskkへ渡すカーソル前テキストの最大文字数
+constexpr unsigned int kMaxSurroundingContextChars = 64;
+// コミット履歴として保持する最大文字数
+constexpr unsigned int kMaxCommittedHistoryChars = 128;
+
+// UTF-8文字列の先頭からcharCount文字分のバイト列を返す。
+std::string utf8PrefixByChars(const std::string &text,
+                              unsigned int charCount) {
+  const auto *bytes = reinterpret_cast<const unsigned char *>(text.data());
+  size_t bytePos = 0;
+  unsigned int chars = 0;
+  while (bytePos < text.size()) {
+    if ((bytes[bytePos] & 0xC0) != 0x80) {
+      if (chars == charCount) {
+        break;
+      }
+      chars++;
+    }
+    bytePos++;
+  }
+  return text.substr(0, bytePos);
+}
+
+// UTF-8文字列の末尾charCount文字分のバイト列を返す。
+std::string utf8SuffixByChars(const std::string &text,
+                              unsigned int charCount) {
+  unsigned int totalChars = 0;
+  for (char byte : text) {
+    if ((static_cast<unsigned char>(byte) & 0xC0) != 0x80) {
+      totalChars++;
+    }
+  }
+  if (totalChars <= charCount) {
+    return text;
+  }
+  unsigned int skipChars = totalChars - charCount;
+  const auto *bytes = reinterpret_cast<const unsigned char *>(text.data());
+  size_t bytePos = 0;
+  unsigned int seen = 0;
+  while (bytePos < text.size()) {
+    if ((bytes[bytePos] & 0xC0) != 0x80) {
+      if (seen == skipChars) {
+        break;
+      }
+      seen++;
+    }
+    bytePos++;
+  }
+  return text.substr(bytePos);
+}
+} // namespace
+
 FcitxCskkContext::FcitxCskkContext(FcitxCskkEngine *engine, InputContext *ic)
     : context_(skk_context_new(nullptr, 0)), ic_(ic), engine_(engine) {
   CSKK_DEBUG() << "Cskk context new";
@@ -347,6 +401,8 @@ void FcitxCskkContext::keyEvent(KeyEvent &keyEvent) {
     CSKK_ERROR() << "CSKK Context is not setup. Ignored key.";
     return;
   }
+  // 文脈適応型変換: 変換前にカーソル周辺テキストをlibcskkへ反映する。
+  updateSurroundingText();
   auto candidateList = std::dynamic_pointer_cast<FcitxCskkCandidateList>(
       ic_->inputPanel().candidateList());
   if (candidateList != nullptr && !candidateList->empty()) {
@@ -424,6 +480,33 @@ void FcitxCskkContext::reset() {
   updateUI();
 }
 
+void FcitxCskkContext::updateSurroundingText() {
+  if (!context_) {
+    return;
+  }
+  const auto &surroundingText = ic_->surroundingText();
+  std::string beforeCursor;
+  if (surroundingText.isValid()) {
+    // Surrounding Textのcursorは文字数単位のオフセット。
+    beforeCursor =
+        utf8PrefixByChars(surroundingText.text(), surroundingText.cursor());
+  } else {
+    // Surrounding Textを提供しないアプリ向けに、自エンジンのコミット履歴で
+    // 文脈を代替する。
+    beforeCursor = committedTextHistory_;
+  }
+  const auto contextText =
+      utf8SuffixByChars(beforeCursor, kMaxSurroundingContextChars);
+  CSKK_DEBUG() << "surrounding text for context ranking: " << contextText;
+  skk_context_set_surrounding_text(context_, contextText.c_str());
+}
+
+void FcitxCskkContext::appendCommittedTextHistory(const std::string &text) {
+  committedTextHistory_.append(text);
+  committedTextHistory_ =
+      utf8SuffixByChars(committedTextHistory_, kMaxCommittedHistoryChars);
+}
+
 void FcitxCskkContext::updateUI() {
   if (!context_) {
     CSKK_WARN() << "No context setup";
@@ -437,6 +520,8 @@ void FcitxCskkContext::updateUI() {
   if (auto *output = skk_context_poll_output(context_)) {
     CSKK_DEBUG() << "output: " << output;
     if (strlen(output) > 0) {
+      // 文脈適応型変換のフォールバック用コミット履歴を更新する。
+      appendCommittedTextHistory(output);
       ic_->commitString(output);
     }
     skk_free_string(output);
@@ -508,6 +593,14 @@ void FcitxCskkContext::applyConfig() {
                                engine_->dictionaries().size());
   skk_context_set_period_style(context_, *config.periodStyle);
   skk_context_set_comma_style(context_, *config.commaStyle);
+  skk_context_set_context_ranking_enabled(
+      context_, config.contextRankingEnabled.value());
+  // モデルが見つからない場合はlibcskk側でIdentityRanker相当に
+  // フォールバックする (従来のSKK動作)。
+  if (config.contextRankingEnabled.value()) {
+    skk_context_use_ngram_ranker(context_,
+                                 config.contextRankingModelPath->c_str(), "");
+  }
 }
 
 void FcitxCskkContext::copyTo(InputContextProperty * /*unused*/) {

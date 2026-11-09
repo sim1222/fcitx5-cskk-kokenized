@@ -95,6 +95,9 @@ public:
   void reset();
   void updateUI();
   void applyConfig();
+  // 文脈適応型変換用に、カーソル周辺テキストをlibcskkに反映する。
+  // Surrounding Textが無効なアプリ向けに自エンジンのコミット履歴で代替する。
+  void updateSurroundingText();
 
   bool saveDictionary();
   // value castable to InputMode
@@ -110,6 +113,10 @@ private:
   CskkContext *context_;
   InputContext *ic_;
   FcitxCskkEngine *engine_;
+  // 文脈適応型変換のフォールバック用: 自エンジンがコミットした文字列の履歴。
+  std::string committedTextHistory_;
+  // コミット履歴を更新する。履歴は上限文字数まで保持する。
+  void appendCommittedTextHistory(const std::string &text);
   bool handleCandidateSelection(
       const std::shared_ptr<FcitxCskkCandidateList> &candidateList,
       KeyEvent &keyEvent);

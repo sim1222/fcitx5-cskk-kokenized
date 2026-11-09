@@ -141,6 +141,17 @@ FCITX_CONFIGURATION(
         showAnnotationCondition{this, "Show Annotation when",
                                 _("Show Annotation when"),
                                 ShowAnnotationCondition::Always};
+    // 文脈適応型変換: 周辺テキストに基づく変換候補の自動再ランキング。
+    // 無効にすると従来のSKK変換動作になる。
+    Option<bool> contextRankingEnabled{
+        this, "ContextAwareRanking", _("Context-aware candidate ranking"),
+        true};
+    // 文脈適応型変換のN-gramモデルファイルのパス。
+    // 空文字列の場合はXDGデータディレクトリから
+    // "libcskk/context_ngram_model.bin"を探す。
+    Option<std::string> contextRankingModelPath{
+        this, "ContextAwareRankingModelPath",
+        _("Path to the context ranking N-gram model file"), ""};
     ExternalOption dictionary{
         this, "Dictionary", _("Dictionary"),
         "fcitx://config/addon/cskk/dictionary_list"};) // FCITX_CONFIGURATION
