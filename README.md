@@ -1,3 +1,24 @@
+# fcitx5-cskk-kokenized
+
+[fcitx/fcitx5-cskk](https://github.com/fcitx5/fcitx5-cskk) のごった混ぜ fork です。
+[cskk-kokenized](https://github.com/sim1222/cskk-kokenized) (libcskk fork)
+と組み合わせて使用します。
+
+## 追加機能
+
+- **文脈適応型変換**: カーソル周辺テキスト (Fcitx5 Surrounding Text API) を
+  libcskk に渡し、zenzai (zenz) モデルによる変換候補の自動再ランキングを有効化。
+  未対応アプリでは自エンジンのコミット履歴で文脈を代替します。
+- アドオン設定に `Context-aware candidate ranking` (有効/無効) と
+  `ContextAwareZenzModelPath` (モデルGGUFのパス、空でXDG自動検索) を追加。
+  無効化またはモデルがない場合は従来のSKK動作になります。
+
+## 開発について
+
+- 本 fork の開発には Coding Agent を利用しています。
+
+---
+
 ## ![cskk logo](https://raw.githubusercontent.com/naokiri/fcitx5-cskk/master/data/icon/48x48/apps/cskk.png) fcitx5-cskk 
 [Fcitx5](https://github.com/fcitx/fcitx5) でskk入力方式で入力するためのインプットメソッドプラグイン。
 
@@ -108,4 +129,3 @@ warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Gen
 
 You should have received a copy of the GNU General Public License along with this program. If not,
 see <https://www.gnu.org/licenses/>.
-
