@@ -598,8 +598,9 @@ void FcitxCskkContext::applyConfig() {
   // モデルが見つからない場合はlibcskk側でIdentityRanker相当に
   // フォールバックする (従来のSKK動作)。
   if (config.contextRankingEnabled.value()) {
-    skk_context_use_ngram_ranker(context_,
-                                 config.contextRankingModelPath->c_str(), "");
+    skk_context_use_zenz_ranker(context_,
+                                config.contextRankingZenzModelPath->c_str(),
+                                "");
   }
 }
 

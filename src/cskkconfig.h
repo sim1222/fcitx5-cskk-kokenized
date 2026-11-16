@@ -146,12 +146,14 @@ FCITX_CONFIGURATION(
     Option<bool> contextRankingEnabled{
         this, "ContextAwareRanking", _("Context-aware candidate ranking"),
         true};
-    // 文脈適応型変換のN-gramモデルファイルのパス。
-    // 空文字列の場合はXDGデータディレクトリから
-    // "libcskk/context_ngram_model.bin"を探す。
-    Option<std::string> contextRankingModelPath{
-        this, "ContextAwareRankingModelPath",
-        _("Path to the context ranking N-gram model file"), ""};
+    // 文脈適応型変換のzenzモデル (GGUF) のパス。
+    // 空文字列の場合はXDGデータディレクトリから "libcskk/zenz.gguf"を探す。
+    // 実行にはllama.cppが必要 (zenz公式GGUFはazooKeyフォークの
+    // libllama-azookeyが必要。jinen等のmainline互換GGUFはシステムの
+    // llama.cppで動作する)。
+    Option<std::string> contextRankingZenzModelPath{
+        this, "ContextAwareZenzModelPath",
+        _("Path to the zenz model (GGUF) for context ranking"), ""};
     ExternalOption dictionary{
         this, "Dictionary", _("Dictionary"),
         "fcitx://config/addon/cskk/dictionary_list"};) // FCITX_CONFIGURATION
